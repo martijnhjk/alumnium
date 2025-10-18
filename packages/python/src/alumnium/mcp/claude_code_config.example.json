@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "alumnium": {
+      "command": "alumnium-mcp",
+      "env": {
+        "ALUMNIUM_MODEL": "anthropic/claude-haiku-4-5-20251001",
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      }
+    }
+  }
+}

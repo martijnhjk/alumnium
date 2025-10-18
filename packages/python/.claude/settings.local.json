@@ -1,0 +1,6 @@
+{
+  "enabledMcpjsonServers": [
+    "alumnium"
+  ],
+  "enableAllProjectMcpServers": true
+}
