@@ -32,7 +32,7 @@ class AlumniumMCPServer:
             """List all available Alumnium tools."""
             return [
                 Tool(
-                    name="alumnium_start_driver",
+                    name="start_driver",
                     description="Initialize a browser driver for automated testing. Returns a driver_id for use in other calls.",
                     inputSchema={
                         "type": "object",
@@ -51,7 +51,7 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_do",
+                    name="do",
                     description="Execute a goal using natural language (e.g., 'click login button', 'fill out the form'). Alumnium will plan and execute the necessary steps.",
                     inputSchema={
                         "type": "object",
@@ -69,7 +69,7 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_check",
+                    name="check",
                     description="Verify a statement is true about the current page. Raises error if false. Returns explanation.",
                     inputSchema={
                         "type": "object",
@@ -89,7 +89,7 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_get",
+                    name="get",
                     description="Extract data from the page (e.g., 'user name', 'product prices', 'item count'). Returns the extracted data.",
                     inputSchema={
                         "type": "object",
@@ -109,7 +109,7 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_area",
+                    name="area",
                     description="Create a scoped area for focused operations (e.g., 'navigation sidebar', 'product grid'). Returns area_id for use with area_* tools.",
                     inputSchema={
                         "type": "object",
@@ -165,7 +165,7 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_get_accessibility_tree",
+                    name="get_accessibility_tree",
                     description="Get structured representation of current page for debugging. Useful for understanding page structure.",
                     inputSchema={
                         "type": "object",
@@ -176,8 +176,19 @@ class AlumniumMCPServer:
                     },
                 ),
                 Tool(
-                    name="alumnium_quit_driver",
+                    name="quit_driver",
                     description="Close browser/app and cleanup driver resources.",
+                    inputSchema={
+                        "type": "object",
+                        "properties": {
+                            "driver_id": {"type": "string"},
+                        },
+                        "required": ["driver_id"],
+                    },
+                ),
+                Tool(
+                    name="save_cache",
+                    description="Save the Alumnium cache for a driver session. This persists learned interactions for future use.",
                     inputSchema={
                         "type": "object",
                         "properties": {
@@ -192,15 +203,15 @@ class AlumniumMCPServer:
         async def call_tool(name: str, arguments: dict[str, Any]) -> list[Any]:
             """Handle tool execution."""
             try:
-                if name == "alumnium_start_driver":
+                if name == "start_driver":
                     return await self._start_driver(arguments)
-                elif name == "alumnium_do":
+                elif name == "do":
                     return await self._alumnium_do(arguments)
-                elif name == "alumnium_check":
+                elif name == "check":
                     return await self._alumnium_check(arguments)
-                elif name == "alumnium_get":
+                elif name == "get":
                     return await self._alumnium_get(arguments)
-                elif name == "alumnium_area":
+                elif name == "area":
                     return await self._alumnium_area(arguments)
                 elif name == "area_do":
                     return await self._area_do(arguments)
@@ -208,10 +219,12 @@ class AlumniumMCPServer:
                     return await self._area_check(arguments)
                 elif name == "area_get":
                     return await self._area_get(arguments)
-                elif name == "alumnium_get_accessibility_tree":
+                elif name == "get_accessibility_tree":
                     return await self._get_accessibility_tree(arguments)
-                elif name == "alumnium_quit_driver":
+                elif name == "quit_driver":
                     return await self._quit_driver(arguments)
+                elif name == "save_cache":
+                    return await self._save_cache(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
             except Exception as e:
@@ -237,7 +250,7 @@ class AlumniumMCPServer:
             raise ValueError(f"Unsupported platform: {platform}")
 
         # Create Alumni instance with model from environment
-        model = Model()  # Will use ALUMNIUM_MODEL env var or default
+        model = Model.current  # Will use ALUMNIUM_MODEL env var or default
         al = Alumni(driver, model=model)
 
         # Generate unique driver ID
@@ -274,9 +287,14 @@ class AlumniumMCPServer:
             raise ValueError(f"Driver {driver_id} not found.")
 
         al, _ = _drivers[driver_id]
-        explanation = al.check(statement, vision=vision)
+        try:
+            explanation = al.check(statement, vision=vision)
+            result = True
+        except AssertionError as e:
+            explanation = str(e)
+            result = False
 
-        return [{"type": "text", "text": f"Check passed: {statement}\nExplanation: {explanation}"}]
+        return [{"type": "text", "text": f"Check finished: {statement}\nResult: {result}\nExplanation: {explanation}"}]
 
     async def _alumnium_get(self, args: dict[str, Any]) -> list[dict]:
         """Execute Alumni.get()."""
@@ -381,6 +399,18 @@ class AlumniumMCPServer:
         del _drivers[driver_id]
 
         return [{"type": "text", "text": f"Driver {driver_id} closed successfully"}]
+
+    async def _save_cache(self, args: dict[str, Any]) -> list[dict]:
+        """Save the cache for a driver session."""
+        driver_id = args["driver_id"]
+
+        if driver_id not in _drivers:
+            raise ValueError(f"Driver {driver_id} not found.")
+
+        al, _ = _drivers[driver_id]
+        al.cache.save()
+
+        return [{"type": "text", "text": f"Cache saved successfully for driver {driver_id}"}]
 
     async def run(self):
         """Run the MCP server using stdio transport."""

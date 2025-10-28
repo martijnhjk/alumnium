@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "alumnium": {
+      "type": "stdio",
+      "command": "poetry",
+      "args": [
+        "run",
+        "mcp"
+      ],
+      "env": {
+        "AZURE_OPENAI_API_KEY": "${AZURE_OPENAI_API_KEY}",
+        "AZURE_OPENAI_API_VERSION": "${AZURE_OPENAI_API_VERSION}",
+        "AZURE_OPENAI_ENDPOINT": "${AZURE_OPENAI_ENDPOINT}",
+        "ALUMNIUM_MODEL": "azure_openai"
+      }
+    }
+  }
+}
