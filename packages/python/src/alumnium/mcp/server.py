@@ -244,8 +244,38 @@ class AlumniumMCPServer:
             driver = Chrome(options=options)
             if url:
                 driver.get(url)
-        elif platform == "android" or platform == "ios":
-            raise NotImplementedError(f"Platform {platform} requires Appium setup. Use Selenium/Playwright for now.")
+        elif platform == "ios":
+            from appium.options.ios import XCUITestOptions
+            from appium.webdriver.client_config import AppiumClientConfig
+            from appium.webdriver.webdriver import WebDriver as Appium
+
+            # Set up iOS/XCUITest options
+            options = XCUITestOptions()
+            options.automation_name = "XCUITest"
+            options.platform_name = "iOS"
+            options.device_name = os.getenv("ALUMNIUM_IOS_DEVICE_NAME", "iPhone 16")
+            options.platform_version = os.getenv("ALUMNIUM_IOS_PLATFORM_VERSION", "18.4")
+            options.new_command_timeout = 300
+            options.wda_launch_timeout = 90_000  # ms
+
+            # Use url parameter as app path
+            if url:
+                options.app = url.replace("file://", "")
+            else:
+                # If no app path provided, use Safari browser
+                options.bundle_id = "com.apple.mobilesafari"
+
+            # Set up Appium client config
+            appium_server = os.getenv("ALUMNIUM_APPIUM_SERVER", "http://localhost:4723")
+            client_config = AppiumClientConfig(
+                remote_server_addr=appium_server,
+                direct_connection=True,
+            )
+
+            # Create Appium driver
+            driver = Appium(client_config=client_config, options=options)
+        elif platform == "android":
+            raise NotImplementedError(f"Platform {platform} requires Appium setup. Not yet implemented.")
         else:
             raise ValueError(f"Unsupported platform: {platform}")
 
@@ -376,7 +406,7 @@ class AlumniumMCPServer:
 
         al, _ = _drivers[driver_id]
         # Access the internal driver's accessibility tree
-        tree = str(al._driver.accessibility_tree)
+        tree = str(al.driver.accessibility_tree.to_str())
 
         return [{"type": "text", "text": f"Accessibility Tree:\n{tree}"}]
 
@@ -392,7 +422,7 @@ class AlumniumMCPServer:
         driver.quit()
 
         # Clean up areas associated with this driver
-        areas_to_remove = [area_id for area_id, area in _areas.items() if area._driver == al._driver]
+        areas_to_remove = [area_id for area_id, area in _areas.items() if area.driver == al.driver]
         for area_id in areas_to_remove:
             del _areas[area_id]
 
